@@ -5,7 +5,7 @@ export PATH
 #=================================================
 #	System Required: Debian/Ubuntu
 #	Description: TCP-BBR
-#	Version: 1.0.12
+#	Version: 1.0.15
 #	Author: Toyo
 #	Blog: https://doub.io/wlzy-16/
 #=================================================
@@ -15,6 +15,9 @@ Info="${Green_font_prefix}[信息]${Font_color_suffix}"
 Error="${Red_font_prefix}[错误]${Font_color_suffix}"
 Tip="${Green_font_prefix}[注意]${Font_color_suffix}"
 
+check_root(){
+	[[ $EUID != 0 ]] && echo -e "${Error} 当前账号非ROOT(或没有ROOT权限)，无法继续操作，请使用${Green_background_prefix} sudo su ${Font_color_suffix}来获取临时ROOT权限（执行后会提示输入当前账号的密码）。" && exit 1
+}
 #检查系统
 check_sys(){
 	if [[ -f /etc/redhat-release ]]; then
@@ -54,12 +57,10 @@ get_latest_version(){
 		deb_name=$(wget -qO- http://kernel.ubuntu.com/~kernel-ppa/mainline/v${latest_version}/ | grep "linux-image" | grep "generic" | awk -F'\">' '/amd64.deb/{print $2}' | cut -d'<' -f1 | head -1)
 		deb_kernel_url="http://kernel.ubuntu.com/~kernel-ppa/mainline/v${latest_version}/${deb_name}"
 		deb_kernel_name="linux-image-${latest_version}-amd64.deb"
-	elif [ ${bit} == "i386" ]; then
+	else
 		deb_name=$(wget -qO- http://kernel.ubuntu.com/~kernel-ppa/mainline/v${latest_version}/ | grep "linux-image" | grep "generic" | awk -F'\">' '/i386.deb/{print $2}' | cut -d'<' -f1 | head -1)
 		deb_kernel_url="http://kernel.ubuntu.com/~kernel-ppa/mainline/v${latest_version}/${deb_name}"
 		deb_kernel_name="linux-image-${latest_version}-i386.deb"
-	else
-		echo -e "${Error} 不支持 ${bit} !" && exit 1
 	fi
 }
 #检查内核是否满足
@@ -112,13 +113,7 @@ del_deb_over(){
 }
 # 安装BBR
 installbbr(){
-# 系统判断
-	check_sys
-	if [[ ${release} != "debian" ]]; then
-		if [[ ${release} != "ubuntu" ]]; then
-			echo -e "${Error} 本脚本不支持当前系统 !" && exit 1
-		fi
-	fi
+	check_root
 	get_latest_version
 	deb_ver=`dpkg -l|grep linux-image | awk '{print $2}' | awk -F '-' '{print $3}' | grep '[4-9].[0-9]*.'`
 	if [ "${deb_ver}" != "" ]; then	
@@ -187,6 +182,13 @@ addsysctl(){
 	echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
 	sysctl -p
 }
+startbbr(){
+	check_deb_off
+	bbrstatus
+	addsysctl
+	sleep 1s
+	bbrstatus
+}
 # 关闭BBR
 stopbbr(){
 	check_deb_off
@@ -208,15 +210,16 @@ statusbbr(){
 	bbrstatus
 	echo -e "${Error} BBR 未开启 !"
 }
-
+check_sys
+[[ ${release} != "debian" ]] && [[ ${release} != "ubuntu" ]] && echo -e "${Error} 本脚本不支持当前系统 ${release} !" && exit 1
 action=$1
 [ -z $1 ] && action=install
 case "$action" in
-	install|stop|status)
+	install|start|stop|status)
 	${action}bbr
 	;;
 	*)
 	echo "输入错误 !"
-	echo "用法: { install | stop | status }"
+	echo "用法: { install | start | stop | status }"
 	;;
 esac

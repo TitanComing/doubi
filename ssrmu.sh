@@ -5,12 +5,12 @@ export PATH
 #=================================================
 #	System Required: CentOS 6+/Debian 6+/Ubuntu 14.04+
 #	Description: Install the ShadowsocksR mudbjson server
-#	Version: 1.0.17
+#	Version: 1.0.25
 #	Author: Toyo
 #	Blog: https://doub.io/ss-jc60/
 #=================================================
 
-sh_ver="1.0.17"
+sh_ver="1.0.25"
 filepath=$(cd "$(dirname "$0")"; pwd)
 file=$(echo -e "${filepath}"|awk -F "$0" '{print $1}')
 ssr_folder="/usr/local/shadowsocksr"
@@ -139,9 +139,9 @@ Get_User_info(){
 	if [[ -z "${match_info}" ]]; then
 		echo -e "${Error} 用户信息获取失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
 	fi
-	user_name=$(echo "${user_info_get}"|grep -w "user :"|sed 's/[[:space:]]//g'|awk -F ":" '{print $NF}')
+	user_name=$(echo "${user_info_get}"|grep -w "user :"|awk -F "user : " '{print $NF}')
 	port=$(echo "${user_info_get}"|grep -w "port :"|sed 's/[[:space:]]//g'|awk -F ":" '{print $NF}')
-	password=$(echo "${user_info_get}"|grep -w "passwd :"|sed 's/[[:space:]]//g'|awk -F ":" '{print $NF}')
+	password=$(echo "${user_info_get}"|grep -w "passwd :"|awk -F "passwd : " '{print $NF}')
 	method=$(echo "${user_info_get}"|grep -w "method :"|sed 's/[[:space:]]//g'|awk -F ":" '{print $NF}')
 	protocol=$(echo "${user_info_get}"|grep -w "protocol :"|sed 's/[[:space:]]//g'|awk -F ":" '{print $NF}')
 	protocol_param=$(echo "${user_info_get}"|grep -w "protocol_param :"|sed 's/[[:space:]]//g'|awk -F ":" '{print $NF}')
@@ -258,6 +258,23 @@ Get_User_transfer(){
 	fi
 	#echo "transfer_enable_Used_2=${transfer_enable_Used_2}"
 }
+Get_User_transfer_all(){
+	if [[ ${transfer_enable_Used_233} -lt 1024 ]]; then
+		transfer_enable_Used_233_2="${transfer_enable_Used_233} B"
+	elif [[ ${transfer_enable_Used_233} -lt 1048576 ]]; then
+		transfer_enable_Used_233_2=$(awk 'BEGIN{printf "%.2f\n",'${transfer_enable_Used_233}'/'1024'}')
+		transfer_enable_Used_233_2="${transfer_enable_Used_233_2} KB"
+	elif [[ ${transfer_enable_Used_233} -lt 1073741824 ]]; then
+		transfer_enable_Used_233_2=$(awk 'BEGIN{printf "%.2f\n",'${transfer_enable_Used_233}'/'1048576'}')
+		transfer_enable_Used_233_2="${transfer_enable_Used_233_2} MB"
+	elif [[ ${transfer_enable_Used_233} -lt 1099511627776 ]]; then
+		transfer_enable_Used_233_2=$(awk 'BEGIN{printf "%.2f\n",'${transfer_enable_Used_233}'/'1073741824'}')
+		transfer_enable_Used_233_2="${transfer_enable_Used_233_2} GB"
+	elif [[ ${transfer_enable_Used_233} -lt 1125899906842624 ]]; then
+		transfer_enable_Used_233_2=$(awk 'BEGIN{printf "%.2f\n",'${transfer_enable_Used_233}'/'1099511627776'}')
+		transfer_enable_Used_233_2="${transfer_enable_Used_233_2} TB"
+	fi
+}
 urlsafe_base64(){
 	date=$(echo -n "$1"|base64|sed ':a;N;s/\n/ /g;ta'|sed 's/ //g;s/=//g;s/+/-/g;s/\//_/g')
 	echo -e "${date}"
@@ -328,7 +345,7 @@ View_User(){
 	done
 }
 View_User_info(){
-	ip=$(cat ${config_user_api_file}|grep "SERVER_PUB_ADDR = "|awk -F "\'" '{print $2}')
+	ip=$(cat ${config_user_api_file}|grep "SERVER_PUB_ADDR = "|awk -F "[']" '{print $2}')
 	[[ -z "${ip}" ]] && Get_IP
 	ss_ssr_determine
 	clear && echo "===================================================" && echo
@@ -459,8 +476,8 @@ Set_config_protocol(){
  ${Green_font_prefix}5.${Font_color_suffix} auth_chain_a
  ${Green_font_prefix}6.${Font_color_suffix} auth_chain_b
  ${Tip} 如果使用 auth_chain_* 系列协议，建议加密方式选择 none (该系列协议自带 RC4 加密)，混淆随意" && echo
-	stty erase '^H' && read -p "(默认: 2. auth_sha1_v4):" ssr_protocol
-	[[ -z "${ssr_protocol}" ]] && ssr_protocol="2"
+	stty erase '^H' && read -p "(默认: 3. auth_aes128_md5):" ssr_protocol
+	[[ -z "${ssr_protocol}" ]] && ssr_protocol="3"
 	if [[ ${ssr_protocol} == "1" ]]; then
 		ssr_protocol="origin"
 	elif [[ ${ssr_protocol} == "2" ]]; then
@@ -474,7 +491,7 @@ Set_config_protocol(){
 	elif [[ ${ssr_protocol} == "6" ]]; then
 		ssr_protocol="auth_chain_b"
 	else
-		ssr_protocol="auth_sha1_v4"
+		ssr_protocol="auth_aes128_md5"
 	fi
 	echo && echo ${Separator_1} && echo -e "	协议 : ${Green_font_prefix}${ssr_protocol}${Font_color_suffix}" && echo ${Separator_1} && echo
 	if [[ ${ssr_protocol} != "origin" ]]; then
@@ -601,7 +618,11 @@ Set_config_transfer(){
 }
 Set_config_forbid(){
 	echo "请输入要设置的用户 禁止访问的端口"
-	echo -e "${Tip} 禁止的端口：例如不允许访问 25端口，用户就无法通过SSR代理访问 邮件端口25了，如果禁止了 80,443 那么用户将无法正常访问 http/https 网站。"
+	echo -e "${Tip} 禁止的端口：例如不允许访问 25端口，用户就无法通过SSR代理访问 邮件端口25了，如果禁止了 80,443 那么用户将无法正常访问 http/https 网站。
+封禁单个端口格式: 25
+封禁多个端口格式: 23,465
+封禁  端口段格式: 233-266
+封禁多种格式端口: 25,465,233-666 (不带冒号:)"
 	stty erase '^H' && read -p "(默认为空 不禁止访问任何端口):" ssr_forbid
 	[[ -z "${ssr_forbid}" ]] && ssr_forbid=""
 	echo && echo ${Separator_1} && echo -e "	禁止的端口 : ${Green_font_prefix}${ssr_forbid}${Font_color_suffix}" && echo ${Separator_1} && echo
@@ -650,7 +671,7 @@ Set_config_enable(){
 Set_user_api_server_pub_addr(){
 	addr=$1
 	if [[ "${addr}" == "Modify" ]]; then
-		server_pub_addr=$(cat ${config_user_api_file}|grep "SERVER_PUB_ADDR = "|awk -F "\'" '{print $2}')
+		server_pub_addr=$(cat ${config_user_api_file}|grep "SERVER_PUB_ADDR = "|awk -F "[']" '{print $2}')
 		if [[ -z ${server_pub_addr} ]]; then
 			echo -e "${Error} 获取当前配置的 服务器IP或域名失败！" && exit 1
 		else
@@ -707,57 +728,57 @@ Set_config_all(){
 Modify_config_password(){
 	match_edit=$(python mujson_mgr.py -e -p "${ssr_port}" -k "${ssr_password}"|grep -w "edit user ")
 	if [[ -z "${match_edit}" ]]; then
-		echo -e "${Error} 用户修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
+		echo -e "${Error} 用户密码修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
 	else
-		echo -e "${Info} 用户修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
+		echo -e "${Info} 用户密码修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
 	fi
 }
 Modify_config_method(){
 	match_edit=$(python mujson_mgr.py -e -p "${ssr_port}" -m "${ssr_method}"|grep -w "edit user ")
 	if [[ -z "${match_edit}" ]]; then
-		echo -e "${Error} 用户修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
+		echo -e "${Error} 用户加密方式修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
 	else
-		echo -e "${Info} 用户修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
+		echo -e "${Info} 用户加密方式修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
 	fi
 }
 Modify_config_protocol(){
 	match_edit=$(python mujson_mgr.py -e -p "${ssr_port}" -O "${ssr_protocol}"|grep -w "edit user ")
 	if [[ -z "${match_edit}" ]]; then
-		echo -e "${Error} 用户修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
+		echo -e "${Error} 用户协议修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
 	else
-		echo -e "${Info} 用户修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
+		echo -e "${Info} 用户协议修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
 	fi
 }
 Modify_config_obfs(){
 	match_edit=$(python mujson_mgr.py -e -p "${ssr_port}" -o "${ssr_obfs}"|grep -w "edit user ")
 	if [[ -z "${match_edit}" ]]; then
-		echo -e "${Error} 用户修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
+		echo -e "${Error} 用户混淆修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
 	else
-		echo -e "${Info} 用户修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
+		echo -e "${Info} 用户混淆修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
 	fi
 }
 Modify_config_protocol_param(){
 	match_edit=$(python mujson_mgr.py -e -p "${ssr_port}" -G "${ssr_protocol_param}"|grep -w "edit user ")
 	if [[ -z "${match_edit}" ]]; then
-		echo -e "${Error} 用户修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
+		echo -e "${Error} 用户协议参数(设备数限制)修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
 	else
-		echo -e "${Info} 用户修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
+		echo -e "${Info} 用户议参数(设备数限制)修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
 	fi
 }
 Modify_config_speed_limit_per_con(){
 	match_edit=$(python mujson_mgr.py -e -p "${ssr_port}" -s "${ssr_speed_limit_per_con}"|grep -w "edit user ")
 	if [[ -z "${match_edit}" ]]; then
-		echo -e "${Error} 用户修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
+		echo -e "${Error} 用户单线程限速修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
 	else
-		echo -e "${Info} 用户修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
+		echo -e "${Info} 用户单线程限速修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
 	fi
 }
 Modify_config_speed_limit_per_user(){
 	match_edit=$(python mujson_mgr.py -e -p "${ssr_port}" -S "${ssr_speed_limit_per_user}"|grep -w "edit user ")
 	if [[ -z "${match_edit}" ]]; then
-		echo -e "${Error} 用户修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
+		echo -e "${Error} 用户端口总限速修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
 	else
-		echo -e "${Info} 用户修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
+		echo -e "${Info} 用户端口总限速修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
 	fi
 }
 Modify_config_connect_verbose_info(){
@@ -766,17 +787,17 @@ Modify_config_connect_verbose_info(){
 Modify_config_transfer(){
 	match_edit=$(python mujson_mgr.py -e -p "${ssr_port}" -t "${ssr_transfer}"|grep -w "edit user ")
 	if [[ -z "${match_edit}" ]]; then
-		echo -e "${Error} 用户修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
+		echo -e "${Error} 用户总流量修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
 	else
-		echo -e "${Info} 用户修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
+		echo -e "${Info} 用户总流量修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
 	fi
 }
 Modify_config_forbid(){
 	match_edit=$(python mujson_mgr.py -e -p "${ssr_port}" -f "${ssr_forbid}"|grep -w "edit user ")
 	if [[ -z "${match_edit}" ]]; then
-		echo -e "${Error} 用户修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
+		echo -e "${Error} 用户禁止访问端口修改失败 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} " && exit 1
 	else
-		echo -e "${Info} 用户修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
+		echo -e "${Info} 用户禁止访问端口修改成功 ${Green_font_prefix}[端口: ${ssr_port}]${Font_color_suffix} (注意：可能需要十秒左右才会应用最新配置)"
 	fi
 }
 Modify_config_enable(){
@@ -818,7 +839,12 @@ Centos_yum(){
 }
 Debian_apt(){
 	apt-get update
-	apt-get install -y vim unzip cron
+	cat /etc/issue |grep 9\..*>/dev/null
+	if [[ $? = 0 ]]; then
+		apt-get install -y vim unzip cron net-tools
+	else
+		apt-get install -y vim unzip cron
+	fi
 }
 # 下载 ShadowsocksR
 Download_SSR(){
@@ -1027,10 +1053,11 @@ debian_View_user_connection_info(){
 				user_IP=`echo -e "\n${user_IP_1}"`
 			fi
 		fi
-		user_list_all=${user_list_all}"端口: ${Green_font_prefix}"${user_port}"${Font_color_suffix}, 链接IP总数: ${Green_font_prefix}"${user_IP_total}"${Font_color_suffix}, 当前链接IP: ${Green_font_prefix}${user_IP}${Font_color_suffix}\n"
+		user_info_233=$(python mujson_mgr.py -l|grep -w "${user_port}"|awk '{print $2}'|sed 's/\[//g;s/\]//g')
+		user_list_all=${user_list_all}"用户名: ${Green_font_prefix}"${user_info_233}"${Font_color_suffix}\t 端口: ${Green_font_prefix}"${user_port}"${Font_color_suffix}\t 链接IP总数: ${Green_font_prefix}"${user_IP_total}"${Font_color_suffix}\t 当前链接IP: ${Green_font_prefix}${user_IP}${Font_color_suffix}\n"
 		user_IP=""
 	done
-	echo -e "用户总数: ${Green_background_prefix} "${user_total}" ${Font_color_suffix} ，链接IP总数: ${Green_background_prefix} "${IP_total}" ${Font_color_suffix} "
+	echo -e "用户总数: ${Green_background_prefix} "${user_total}" ${Font_color_suffix} 链接IP总数: ${Green_background_prefix} "${IP_total}" ${Font_color_suffix} "
 	echo -e "${user_list_all}"
 }
 centos_View_user_connection_info(){
@@ -1054,10 +1081,11 @@ centos_View_user_connection_info(){
 				user_IP=`echo -e "\n${user_IP_1}"`
 			fi
 		fi
-		user_list_all=${user_list_all}"端口: ${Green_font_prefix}"${user_port}"${Font_color_suffix}, 链接IP总数: ${Green_font_prefix}"${user_IP_total}"${Font_color_suffix}, 当前链接IP: ${Green_font_prefix}${user_IP}${Font_color_suffix}\n"
+		user_info_233=$(python mujson_mgr.py -l|grep -w "${user_port}"|awk '{print $2}'|sed 's/\[//g;s/\]//g')
+		user_list_all=${user_list_all}"用户名: ${Green_font_prefix}"${user_info_233}"${Font_color_suffix}\t 端口: ${Green_font_prefix}"${user_port}"${Font_color_suffix}\t 链接IP总数: ${Green_font_prefix}"${user_IP_total}"${Font_color_suffix}\t 当前链接IP: ${Green_font_prefix}${user_IP}${Font_color_suffix}\n"
 		user_IP=""
 	done
-	echo -e "用户总数: ${Green_background_prefix} "${user_total}" ${Font_color_suffix} ，链接IP总数: ${Green_background_prefix} "${IP_total}" ${Font_color_suffix} "
+	echo -e "用户总数: ${Green_background_prefix} "${user_total}" ${Font_color_suffix} 链接IP总数: ${Green_background_prefix} "${IP_total}" ${Font_color_suffix} "
 	echo -e "${user_list_all}"
 }
 View_user_connection_info(){
@@ -1204,31 +1232,46 @@ List_port_user(){
 		user_port=$(echo "${user_info}"|sed -n "${integer}p"|awk '{print $4}')
 		user_username=$(echo "${user_info}"|sed -n "${integer}p"|awk '{print $2}'|sed 's/\[//g;s/\]//g')
 		Get_User_transfer "${user_port}"
+		transfer_enable_Used_233=$(expr $transfer_enable_Used_233 + $transfer_enable_Used_2_1)
 		user_list_all=${user_list_all}"用户名: ${Green_font_prefix} "${user_username}"${Font_color_suffix}\t 端口: ${Green_font_prefix}"${user_port}"${Font_color_suffix}\t 流量使用情况(已用+剩余=总): ${Green_font_prefix}${transfer_enable_Used_2}${Font_color_suffix} + ${Green_font_prefix}${transfer_enable_Used}${Font_color_suffix} = ${Green_font_prefix}${transfer_enable}${Font_color_suffix}\n"
 	done
+	Get_User_transfer_all
 	echo && echo -e "=== 用户总数 ${Green_background_prefix} "${user_total}" ${Font_color_suffix}"
 	echo -e ${user_list_all}
+	echo -e "=== 当前所有用户已使用流量总和: ${Green_background_prefix} ${transfer_enable_Used_233_2} ${Font_color_suffix}\n"
 }
 Add_port_user(){
 	lalal=$1
 	if [[ "$lalal" == "install" ]]; then
 		match_add=$(python mujson_mgr.py -a -u "${ssr_user}" -p "${ssr_port}" -k "${ssr_password}" -m "${ssr_method}" -O "${ssr_protocol}" -G "${ssr_protocol_param}" -o "${ssr_obfs}" -s "${ssr_speed_limit_per_con}" -S "${ssr_speed_limit_per_user}" -t "${ssr_transfer}" -f "${ssr_forbid}"|grep -w "add user info")
 	else
-		Set_config_all
-		match_port=$(python mujson_mgr.py -l|grep -w "port ${ssr_port}$")
-		[[ ! -z "${match_port}" ]] && echo -e "${Error} 该端口 [${ssr_port}] 已存在，请勿重复添加 !" && exit 1
-		match_username=$(python mujson_mgr.py -l|grep -w "user \[${ssr_user}]")
-		[[ ! -z "${match_username}" ]] && echo -e "${Error} 该用户名 [${ssr_user}] 已存在，请勿重复添加 !" && exit 1
-		match_add=$(python mujson_mgr.py -a -u "${ssr_user}" -p "${ssr_port}" -k "${ssr_password}" -m "${ssr_method}" -O "${ssr_protocol}" -G "${ssr_protocol_param}" -o "${ssr_obfs}" -s "${ssr_speed_limit_per_con}" -S "${ssr_speed_limit_per_user}" -t "${ssr_transfer}" -f "${ssr_forbid}"|grep -w "add user info")
-		if [[ -z "${match_add}" ]]; then
-			echo -e "${Error} 用户添加失败 ${Green_font_prefix}[用户名: ${ssr_user} , 端口: ${ssr_port}]${Font_color_suffix} "
-		else
-			Add_iptables
-			Save_iptables
-			echo -e "${Info} 用户添加成功 ${Green_font_prefix}[用户名: ${ssr_user} , 端口: ${ssr_port}]${Font_color_suffix} "
-			Get_User_info "${ssr_port}"
-			View_User_info
-		fi
+		while true
+		do
+			Set_config_all
+			match_port=$(python mujson_mgr.py -l|grep -w "port ${ssr_port}$")
+			[[ ! -z "${match_port}" ]] && echo -e "${Error} 该端口 [${ssr_port}] 已存在，请勿重复添加 !" && exit 1
+			match_username=$(python mujson_mgr.py -l|grep -w "user \[${ssr_user}]")
+			[[ ! -z "${match_username}" ]] && echo -e "${Error} 该用户名 [${ssr_user}] 已存在，请勿重复添加 !" && exit 1
+			match_add=$(python mujson_mgr.py -a -u "${ssr_user}" -p "${ssr_port}" -k "${ssr_password}" -m "${ssr_method}" -O "${ssr_protocol}" -G "${ssr_protocol_param}" -o "${ssr_obfs}" -s "${ssr_speed_limit_per_con}" -S "${ssr_speed_limit_per_user}" -t "${ssr_transfer}" -f "${ssr_forbid}"|grep -w "add user info")
+			if [[ -z "${match_add}" ]]; then
+				echo -e "${Error} 用户添加失败 ${Green_font_prefix}[用户名: ${ssr_user} , 端口: ${ssr_port}]${Font_color_suffix} "
+				break
+			else
+				Add_iptables
+				Save_iptables
+				echo -e "${Info} 用户添加成功 ${Green_font_prefix}[用户名: ${ssr_user} , 端口: ${ssr_port}]${Font_color_suffix} "
+				echo
+				stty erase '^H' && read -p "是否继续 添加用户配置？[Y/n]:" addyn
+				[[ -z ${addyn} ]] && addyn="y"
+				if [[ ${addyn} == [Nn] ]]; then
+					Get_User_info "${ssr_port}"
+					View_User_info
+					break
+				else
+					echo -e "${Info} 继续 添加用户配置..."
+				fi
+			fi
+		done
 	fi
 }
 Del_port_user(){
@@ -1540,8 +1583,7 @@ Configure_BBR(){
 echo -e "${Green_font_prefix} [安装前 请注意] ${Font_color_suffix}
 1. 安装开启BBR，需要更换内核，存在更换失败等风险(重启后无法开机)
 2. 本脚本仅支持 Debian / Ubuntu 系统更换内核，OpenVZ和Docker 不支持更换内核
-3. Debian 更换内核过程中会提示 [ 是否终止卸载内核 ] ，请选择 ${Green_font_prefix} NO ${Font_color_suffix}
-4. 安装BBR并重启服务器后，需要重新运行脚本 启动BBR" && echo
+3. Debian 更换内核过程中会提示 [ 是否终止卸载内核 ] ，请选择 ${Green_font_prefix} NO ${Font_color_suffix}" && echo
 	stty erase '^H' && read -p "(默认: 取消):" bbr_num
 	[[ -z "${bbr_num}" ]] && echo "已取消..." && exit 1
 	if [[ ${bbr_num} == "1" ]]; then
@@ -1587,7 +1629,9 @@ Other_functions(){
   ${Green_font_prefix}5.${Font_color_suffix} 一键解封 BT/PT/SPAM (iptables)
 ————————————
   ${Green_font_prefix}6.${Font_color_suffix} 切换 ShadowsocksR日志输出模式
-  —— 说明：SSR默认只输出错误日志，此项可切换为输出详细的访问日志" && echo
+  —— 说明：SSR默认只输出错误日志，此项可切换为输出详细的访问日志。
+  ${Green_font_prefix}7.${Font_color_suffix} 监控 ShadowsocksR服务端运行状态
+  —— 说明：该功能适合于SSR服务端经常进程结束，启动该功能后会每分钟检测一次，当进程不存在则自动启动SSR服务端。" && echo
 	stty erase '^H' && read -p "(默认: 取消):" other_num
 	[[ -z "${other_num}" ]] && echo "已取消..." && exit 1
 	if [[ ${other_num} == "1" ]]; then
@@ -1602,8 +1646,10 @@ Other_functions(){
 		UnBanBTPTSPAM
 	elif [[ ${other_num} == "6" ]]; then
 		Set_config_connect_verbose_info
+	elif [[ ${other_num} == "7" ]]; then
+		Set_crontab_monitor_ssr
 	else
-		echo -e "${Error} 请输入正确的数字 [1-6]" && exit 1
+		echo -e "${Error} 请输入正确的数字 [1-7]" && exit 1
 	fi
 }
 # 封禁 BT PT SPAM
@@ -1644,6 +1690,73 @@ Set_config_connect_verbose_info(){
 		else
 			echo && echo "	已取消..." && echo
 		fi
+	fi
+}
+Set_crontab_monitor_ssr(){
+	SSR_installation_status
+	crontab_monitor_ssr_status=$(crontab -l|grep "ssrmu.sh monitor")
+	if [[ -z "${crontab_monitor_ssr_status}" ]]; then
+		echo && echo -e "当前监控模式: ${Green_font_prefix}未开启${Font_color_suffix}" && echo
+		echo -e "确定要开启为 ${Green_font_prefix}ShadowsocksR服务端运行状态监控${Font_color_suffix} 功能吗？(当进程关闭则自动启动SSR服务端)[Y/n]"
+		stty erase '^H' && read -p "(默认: y):" crontab_monitor_ssr_status_ny
+		[[ -z "${crontab_monitor_ssr_status_ny}" ]] && crontab_monitor_ssr_status_ny="y"
+		if [[ ${crontab_monitor_ssr_status_ny} == [Yy] ]]; then
+			crontab_monitor_ssr_cron_start
+		else
+			echo && echo "	已取消..." && echo
+		fi
+	else
+		echo && echo -e "当前监控模式: ${Green_font_prefix}已开启${Font_color_suffix}" && echo
+		echo -e "确定要关闭为 ${Green_font_prefix}ShadowsocksR服务端运行状态监控${Font_color_suffix} 功能吗？(当进程关闭则自动启动SSR服务端)[y/N]"
+		stty erase '^H' && read -p "(默认: n):" crontab_monitor_ssr_status_ny
+		[[ -z "${crontab_monitor_ssr_status_ny}" ]] && crontab_monitor_ssr_status_ny="n"
+		if [[ ${crontab_monitor_ssr_status_ny} == [Yy] ]]; then
+			crontab_monitor_ssr_cron_stop
+		else
+			echo && echo "	已取消..." && echo
+		fi
+	fi
+}
+crontab_monitor_ssr(){
+	SSR_installation_status
+	check_pid
+	if [[ -z ${PID} ]]; then
+		echo -e "${Error} [$(date "+%Y-%m-%d %H:%M:%S %u %Z")] 检测到 ShadowsocksR服务端 未运行 , 开始启动..." | tee -a ${ssr_log_file}
+		/etc/init.d/ssrmu start
+		sleep 1s
+		check_pid
+		if [[ -z ${PID} ]]; then
+			echo -e "${Error} [$(date "+%Y-%m-%d %H:%M:%S %u %Z")] ShadowsocksR服务端 启动失败..." | tee -a ${ssr_log_file} && exit 1
+		else
+			echo -e "${Info} [$(date "+%Y-%m-%d %H:%M:%S %u %Z")] ShadowsocksR服务端 启动成功..." | tee -a ${ssr_log_file} && exit 1
+		fi
+	else
+		echo -e "${Info} [$(date "+%Y-%m-%d %H:%M:%S %u %Z")] ShadowsocksR服务端 进程运行正常..." exit 0
+	fi
+}
+crontab_monitor_ssr_cron_start(){
+	crontab -l > "$file/crontab.bak"
+	sed -i "/ssrmu.sh monitor/d" "$file/crontab.bak"
+	echo -e "\n* * * * * /bin/bash $file/ssrmu.sh monitor" >> "$file/crontab.bak"
+	crontab "$file/crontab.bak"
+	rm -r "$file/crontab.bak"
+	cron_config=$(crontab -l | grep "ssrmu.sh monitor")
+	if [[ -z ${cron_config} ]]; then
+		echo -e "${Error} ShadowsocksR服务端运行状态监控功能 启动失败 !" && exit 1
+	else
+		echo -e "${Info} ShadowsocksR服务端运行状态监控功能 启动成功 !"
+	fi
+}
+crontab_monitor_ssr_cron_stop(){
+	crontab -l > "$file/crontab.bak"
+	sed -i "/ssrmu.sh monitor/d" "$file/crontab.bak"
+	crontab "$file/crontab.bak"
+	rm -r "$file/crontab.bak"
+	cron_config=$(crontab -l | grep "ssrmu.sh monitor")
+	if [[ ! -z ${cron_config} ]]; then
+		echo -e "${Error} ShadowsocksR服务端运行状态监控功能 停止失败 !" && exit 1
+	else
+		echo -e "${Info} ShadowsocksR服务端运行状态监控功能 停止成功 !"
 	fi
 }
 Update_Shell(){
@@ -1690,6 +1803,8 @@ check_sys
 action=$1
 if [[ "${action}" == "clearall" ]]; then
 	Clear_transfer_all
+elif [[ "${action}" == "monitor" ]]; then
+	crontab_monitor_ssr
 else
 	echo -e "  ShadowsocksR MuJSON一键管理脚本 ${Red_font_prefix}[v${sh_ver}]${Font_color_suffix}
   ---- Toyo | doub.io/ss-jc60 ----
